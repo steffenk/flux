@@ -23,6 +23,7 @@ use TYPO3\CMS\Core\Utility\ExtensionManagementUtility;
 use TYPO3\CMS\Core\Utility\GeneralUtility;
 use TYPO3\CMS\Extbase\Object\ObjectManager;
 use TYPO3\CMS\Extbase\Utility\ExtensionUtility;
+use TYPO3\CMS\Extbase\Utility\LocalizationUtility;
 
 /**
  * Content Type Builder
@@ -234,8 +235,8 @@ class ContentTypeBuilder
     {
         // Icons required solely for use in the "new content element" wizard
         $formId = $form->getId();
-        $group = $form->getOption(Form::OPTION_GROUP) ?? 'fluxContent';
-        $this->initializeNewContentWizardGroup($this->sanitizeString($group), $group);
+        $group = $this->sanitizeString($form->getOption(Form::OPTION_GROUP) ?? 'fluxContent');
+        $this->initializeNewContentWizardGroup($group['name'], $group['label']);
 
         // Registration for "new content element" wizard to show our new CType (otherwise, only selectable via "Content type" drop-down)
         ExtensionManagementUtility::addPageTSConfig(
@@ -249,13 +250,13 @@ class ContentTypeBuilder
                     }
                 }
                 mod.wizards.newContentElement.wizardItems.%s.show := addToList(%s)',
-                $this->sanitizeString($group),
+                $group['name'],
                 $formId,
                 $this->addIcon($form, $contentType),
                 $form->getLabel(),
                 $form->getDescription(),
                 $contentType,
-                $group,
+                $group['name'],
                 $formId
             )
         );
@@ -263,14 +264,25 @@ class ContentTypeBuilder
 
     /**
      * @param string $string
-     * @return string
+     * @return array
      */
     protected function sanitizeString($string)
     {
+        if (GeneralUtility::isFirstPartOfStr($string, 'LLL:')) {
+            $label = LocalizationUtility::translate($string);
+            $tmp = GeneralUtility::trimExplode('.', $string);
+            $string = array_pop($tmp);
+        }
+
         $pattern = '/([^a-z0-9\-]){1,}/i';
         $replaced = preg_replace($pattern, '_', $string);
         $replaced = trim($replaced, '_');
-        return empty($replaced) ? md5($string) : $replaced;
+        $name = empty($replaced) ? md5($string) : $replaced;
+        $label = $label ?? $name;
+        return [
+          'name' => $name,
+          'label' => $label
+        ];
     }
 
     /**
